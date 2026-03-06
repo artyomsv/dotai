@@ -1,0 +1,33 @@
+# Credentials & secrets
+.credentials.json
+
+# Session history & caches
+history.jsonl
+stats-cache.json
+mcp-needs-auth-cache.json
+cache/
+debug/
+file-history/
+paste-cache/
+telemetry/
+session-env/
+shell-snapshots/
+
+# Application state (ephemeral, per-session)
+projects/
+tasks/
+teams/
+todos/
+plans/
+backups/
+
+# Plugins & binaries (reinstalled per machine)
+plugins/
+
+# IDE & browser state (machine-local)
+ide/
+chrome/
+downloads/
+
+# Feature flags & stats
+statsig/
