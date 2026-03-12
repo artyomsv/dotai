@@ -1,7 +1,7 @@
 ---
 name: rules-compliance
 description: "Checks code changes against project rules defined in .claude/rules/ files. Dynamically loads applicable rules based on changed file types using paths: frontmatter matching. Covers coding conventions, architecture patterns, Docker, git workflow, and CLAUDE.md maintenance."
-model: sonnet
+model: opus
 color: blue
 memory: project
 ---
