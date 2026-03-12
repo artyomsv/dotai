@@ -56,7 +56,7 @@
     "claude-md-management@claude-plugins-official": true,
     "explanatory-output-style@claude-plugins-official": true
   },
+  "effortLevel": "high",
   "autoUpdatesChannel": "latest",
-  "voiceEnabled": false,
-  "effortLevel": "high"
+  "voiceEnabled": false
 }
