@@ -2,6 +2,7 @@
 .credentials.json
 
 # Machine-local config
+CLAUDE.md
 settings.json
 settings.local.json
 keybindings.json
