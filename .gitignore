@@ -1,6 +1,13 @@
 # Credentials & secrets
 .credentials.json
 
+# Machine-local config
+settings.json
+settings.local.json
+keybindings.json
+.claude/settings.local.json
+sessions/
+
 # Session history & caches
 history.jsonl
 stats-cache.json
