@@ -108,7 +108,7 @@ Based on detected project type:
 
 ### Java
 ```bash
-mvn -f {service}/pom.xml test -Dsurefire.useFile=false 2>&1
+mvn -f {service}/pom.xml verify -Dsurefire.useFile=false -Dfailsafe.useFile=false 2>&1
 ```
 
 ### Python
@@ -123,8 +123,6 @@ cd frontend && npm test 2>&1
 ```
 
 Parse output for: total tests, passed, failed (with details), skipped.
-
-**Important**: Only run unit tests by default. Integration tests require infrastructure — run only when explicitly asked.
 
 ## Step 6: Output QA Report
 
@@ -148,7 +146,8 @@ Parse output for: total tests, passed, failed (with details), skipped.
 ### Test Results
 | Area | Tests Run | Passed | Failed | Skipped |
 |------|-----------|--------|--------|---------|
-| Backend | 45 | 45 | 0 | 0 |
+| Backend (unit) | 45 | 45 | 0 | 0 |
+| Backend (integration) | 12 | 12 | 0 | 0 |
 | Frontend | 8 | 8 | 0 | 0 |
 
 ### Failures
