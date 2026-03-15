@@ -86,6 +86,21 @@ Check each recent commit message against git workflow conventions:
 
 If reviewing staged/unstaged changes (no new commits), skip this step and note: "No new commits to check."
 
+## Step 5.5: Run Modernizer Check (Java only)
+
+If any changed files match `**/*.java`:
+
+1. Group Java files by their top-level service directory (first path segment)
+2. For each service, check if `{service}/pom.xml` contains `modernizer-maven-plugin`
+3. If present, run:
+   ```bash
+   mvn -f {service}/pom.xml modernizer:modernizer 2>&1
+   ```
+4. Parse output for violations — lines containing `[ERROR]` from the modernizer plugin
+5. If the plugin is not in the service's pom.xml, skip that service and note it
+
+If no Java files changed, skip this step entirely.
+
 ## Step 6: Output Report
 
 ```
@@ -107,6 +122,9 @@ If reviewing staged/unstaged changes (no new commits), skip this step and note: 
 
 ### CLAUDE.md Update Check
 [Results or "No structural changes detected"]
+
+### Modernizer Check
+[Results, table of violations per service, or "No Java files changed"]
 
 ### Passed Rules
 [List of rule sections that were fully satisfied]
