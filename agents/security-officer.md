@@ -100,6 +100,36 @@ Read each changed file and evaluate against the applicable checklists below. Onl
 - No secrets in migration data inserts
 - `.env` in `.gitignore`; only `.env.example` committed (with no real values)
 
+### 3C.5 Sensitive Data in Tracked Files (CWE-540, CWE-200)
+
+Scan **all tracked files** (not just changed ones) for data that should never be versioned:
+
+```bash
+git ls-files
+```
+
+Check every tracked file against these patterns:
+
+| Pattern | What it catches |
+|---------|----------------|
+| Private IPs: `192.168.x.x`, `10.x.x.x`, `172.16-31.x.x` | Internal network topology |
+| Hostnames: `.internal`, `.local`, `.private`, `.lan` | Internal infrastructure |
+| SSH/SCP commands with usernames: `ssh user@`, `scp user@` | Access credentials + topology |
+| `BEGIN (RSA\|EC\|OPENSSH) PRIVATE KEY` | Private keys |
+| `password\s*[:=]`, `passwd\s*[:=]` (not in rules/docs) | Hardcoded passwords |
+| `(api[_-]?key\|api[_-]?secret\|access[_-]?token)\s*[:=]\s*['"][^${}]` | Real API keys (not env var refs) |
+| `Authorization:\s*Bearer\s+[A-Za-z0-9]` | Hardcoded bearer tokens |
+| `jdbc:.*password=`, `mongodb(\+srv)?://[^$].*:.*@` | DB connection strings with credentials |
+
+**Exclude from scanning**: files that discuss these patterns conceptually (agent definitions, rules files, security checklists, README/docs that mention patterns without real values).
+
+**Severity**:
+- **CRITICAL**: Private keys, real passwords, API keys, DB connection strings with credentials
+- **HIGH**: Internal IPs with SSH usernames, bearer tokens
+- **MEDIUM**: Internal IPs/hostnames without credentials
+
+**Remediation**: `git rm --cached <file>`, add to `.gitignore`, and if the repo is public, rewrite history with `git filter-repo` or `git filter-branch`.
+
 ### 3D. Error Handling & Information Disclosure (CWE-209)
 
 - Error responses do not expose stack traces, internal DB details, or implementation internals
