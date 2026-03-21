@@ -25,6 +25,7 @@ Classify changed files to determine the project type:
 | `**/src/**/*.{ts,tsx}` (excluding tests) | React/TypeScript | TypeScript |
 | `backend/**/*.py` | Python (backend) | Python |
 | `frontend/src/**/*.{ts,tsx}` | React (frontend) | TypeScript |
+| `**/*.go` (excluding `*_test.go`) | Go | Go |
 
 Group files by their top-level directory or module.
 
@@ -63,6 +64,15 @@ Group files by their top-level directory or module.
 
 **Skip**: `components/ui/*` (shadcn-managed), `lib/utils.ts`, `types/*.ts`, `data/*.ts`.
 
+### Go Projects
+
+| Source file pattern | Expected test | Test type |
+|---|---|---|
+| `internal/*/*.go` | `*_test.go` in same package | Unit |
+| `pkg/*/*.go` | `*_test.go` in same package | Unit |
+
+**Skip**: `cmd/*/main.go` (entry points), `*_test.go` (test files themselves), generated code.
+
 For each expected test file, use `Glob` to check if it exists.
 
 ## Step 4: Check Pattern Compliance
@@ -97,6 +107,13 @@ For each **existing** test file, quick-read it and verify:
 - [ ] Tests status codes and response shapes
 - [ ] Decision check: if test uses real DB → must be marked integration
 
+### Go Tests
+- [ ] Table-driven tests with `t.Run()` subtests
+- [ ] `t.Helper()` on test helper functions
+- [ ] `t.TempDir()` / `t.Setenv()` for test isolation (not manual cleanup)
+- [ ] `TestFunctionName_Scenario_Expected` naming
+- [ ] Stdlib assertions (`t.Errorf`, `t.Fatalf`) — matches project convention
+
 ### React/TypeScript Tests
 - [ ] Uses Vitest (`describe`, `it`/`test`, `expect`)
 - [ ] Component tests use `@testing-library/react`
@@ -116,6 +133,11 @@ mvn -f {service}/pom.xml verify -Dsurefire.useFile=false -Dfailsafe.useFile=fals
 cd backend && python -m pytest tests/ -v --tb=short -m "not integration" 2>&1
 ```
 If no integration marker configured: `python -m pytest tests/ -v --tb=short 2>&1`
+
+### Go
+```bash
+go test -v -race ./... 2>&1
+```
 
 ### React/TypeScript
 ```bash

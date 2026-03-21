@@ -26,6 +26,7 @@ Project-specific coding standards (naming conventions, formatting, framework pat
 
 2. **Detect Languages**: Classify changed files by type:
    - **Java**: `*.java`
+   - **Go**: `*.go`
    - **Python**: `*.py`
    - **TypeScript/React**: `*.ts`, `*.tsx`
    - **Config/Infra**: `*.yml`, `*.xml`, `Dockerfile`, etc.
@@ -61,6 +62,16 @@ Project-specific coding standards (naming conventions, formatting, framework pat
 - [ ] No field injection — constructor injection only
 - [ ] Stream pipelines ≤ 5 operations
 - [ ] Guard clauses used to reduce nesting
+
+### Go-Specific (activate when `*.go` files are in the change set)
+- [ ] Errors checked — no `_` on error returns unless justified with comment
+- [ ] Error wrapping with `%w` for context: `fmt.Errorf("doing X: %w", err)`
+- [ ] No goroutine without context cancellation path
+- [ ] No unbuffered channel ops without `select`/timeout
+- [ ] `defer` used for cleanup (file close, mutex unlock)
+- [ ] Platform-specific code uses `//go:build` tags (not `// +build`)
+- [ ] Exported functions have doc comments
+- [ ] No `init()` functions — prefer explicit initialization
 
 ### Python-Specific (activate when `*.py` files are in the change set)
 - [ ] Proper `None`/`Optional` handling — no implicit None returns
