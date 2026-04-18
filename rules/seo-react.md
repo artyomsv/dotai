@@ -44,12 +44,6 @@ paths:
 - Cache sitemap responses with TTL (e.g., 1 hour) to avoid excessive backend calls.
 - Fall back to static pages if the backend service is unavailable.
 
-## Reference Implementation (Fairy Book Gateway)
+## Project-Specific Reference Tables
 
-| Component | Path | Purpose |
-|-----------|------|---------|
-| `JsonLd` | `components/seo/JsonLd.tsx` | JSON-LD injection with XSS protection |
-| Schema builders | `components/seo/schemas.ts` | Organization, WebSite, Product, FAQ, Breadcrumb, ItemList |
-| `PageHead` | `components/seo/PageHead.tsx` | Per-page title, description, canonical, OG/Twitter |
-| `SitemapResource` | `web/rest/SitemapResource.java` | Dynamic sitemap with product URLs |
-| `SeoConfigResource` | `web/rest/SeoConfigResource.java` | Noindex for non-production environments |
+Per-gateway reference tables (component paths, sitemap resources, etc.) live in project rules, not here. See e.g. `monorepo/.claude/rules/seo-fairy-book-refs.md`.

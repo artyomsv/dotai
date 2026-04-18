@@ -28,11 +28,25 @@ Create a debt file whenever you encounter any of these during your work:
 
 - **Proactive**: Create debt files automatically whenever you spot issues — no user confirmation needed
 - **Non-blocking**: Mention created debt files in your response, but don't let debt tracking interrupt the primary task
-- **Duplicate-aware**: Before creating a new file, check if a similar debt already exists in `techdebt/`. Update the existing file instead of creating a duplicate
+- **Duplicate-aware**: Before creating a new file, check if a similar debt already exists anywhere under `techdebt/` (scan the target service folder AND `techdebt/global/`). Update the existing file instead of creating a duplicate
 
-## Folder
+## Folder Layout — Group by Service
 
-Place all debt files in `<project-root>/techdebt/`. Create the folder if it doesn't exist.
+Place all debt files under `<project-root>/techdebt/`, then into a **per-service subfolder** named after the affected service/module directory (e.g., the Maven module folder name in a backend monorepo, or the package/workspace name in a frontend monorepo).
+
+| Scope of the debt | Destination |
+|---|---|
+| Affects exactly one service/module | `techdebt/<service>/` |
+| Requires coordinated changes in 2+ services/modules to fix | `techdebt/global/` |
+| Affects infrastructure, CI/CD, build tooling, or cross-cutting conventions | `techdebt/global/` |
+
+Rules:
+- Use the **exact folder name** of the service as it appears in the repository root (e.g., `techdebt/ingestion/`, `techdebt/fairy-book-gateway/`, `techdebt/organizations/`). Do not invent abbreviations or alternate spellings.
+- Create the service folder if it does not yet exist.
+- Only use `techdebt/global/` when the fix genuinely requires editing 2+ services. A debt that is *about* a cross-service pattern but whose fix lives in a single shared module goes under that module's folder, not `global/`.
+- A debt that spans a service + its gateway (e.g., backend API change + frontend hook change in the app's own gateway) goes under the service folder that owns the root cause, not `global/`. Use `global/` only when the coordination genuinely spans multiple independently-deployed services.
+
+If the project has no clear multi-service structure (single-service repo), omit the per-service grouping and place files directly in `techdebt/`.
 
 ## File Naming
 
@@ -61,15 +75,23 @@ Format: `{criticality}-{complexity}-{kebab-case-description}.md`
 
 ```
 techdebt/
-├── 1-1-missing-auth-check-on-admin-endpoint.md
-├── 1-3-sql-injection-in-search-query.md
-├── 2-2-order-service-missing-unit-tests.md
-├── 2-4-missing-dao-pattern-studio-service.md
-├── 3-2-hardcoded-stripe-webhook-url.md
-├── 3-3-inconsistent-error-handling-payments.md
-├── 4-1-unused-import-in-profile-service.md
-└── 4-5-migrate-deprecated-http-client.md
+├── global/
+│   ├── 1-3-jwt-role-extraction-drift-across-services.md
+│   ├── 2-2-add-version-to-all-jhipster-entities.md
+│   └── 3-2-jhipster-hashcode-pattern-degradation.md
+├── orders/
+│   ├── 2-2-order-service-missing-unit-tests.md
+│   └── 4-1-unused-import-in-order-resource.md
+├── payments/
+│   ├── 3-2-hardcoded-stripe-webhook-url.md
+│   └── 3-3-inconsistent-error-handling-payments.md
+├── studio/
+│   └── 2-4-missing-dao-pattern-studio-service.md
+└── ingestion/
+    └── 1-1-missing-auth-check-on-admin-endpoint.md
 ```
+
+Filenames do NOT repeat the service name — the containing folder already conveys that. Prefer `2-2-order-service-missing-unit-tests.md` → `orders/2-2-missing-unit-tests.md` when creating new entries. Existing files may retain service names in their filenames for backward compatibility.
 
 ## Debt File Template
 

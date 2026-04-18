@@ -1,6 +1,12 @@
 # Credentials & secrets
 .credentials.json
 
+# Ephemeral skill/runtime state
+.caveman-active
+
+# Personal drafts (never commit)
+temp-*.md
+
 # Machine-local config
 CLAUDE.md
 settings.json

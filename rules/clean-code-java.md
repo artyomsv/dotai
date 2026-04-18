@@ -110,25 +110,7 @@ if (status.equals(PENDING_REVIEW)) { ... }
 - Prefer loop-scoped variables over method-scoped ones.
 
 ## Guard Clauses
-- Return early to reduce nesting depth. Max 2 levels of nesting inside a method.
-
-```java
-// BAD
-void process(Order order) {
-    if (order != null) {
-        if (order.isPaid()) {
-            // 20 lines of logic
-        }
-    }
-}
-
-// GOOD
-void process(Order order) {
-    if (order == null) return;
-    if (!order.isPaid()) return;
-    // 20 lines of logic
-}
-```
+- Guard-clause + max-nesting rules live in `clean-code-general.md` ("Return Early"). Apply them in Java too.
 
 ## Stream Pipelines
 - Max 5 chained operations. Extract intermediate results for longer chains.
