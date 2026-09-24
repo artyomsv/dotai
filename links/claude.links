@@ -6,3 +6,4 @@ claude/commands        ~/.claude/commands
 claude/rules           ~/.claude/rules
 claude/hooks           ~/.claude/hooks
 claude/output-styles   ~/.claude/output-styles
+shared/skills/pr-review  ~/.claude/skills/pr-review

@@ -36,6 +36,7 @@ backup. Both scripts also turn on the secret-scanning pre-commit hook.
 |---|---|
 | `claude/` | Claude Code: `agents/`, `commands/`, `rules/`, `hooks/`, `output-styles/` |
 | `codex/` | Codex: global `AGENTS.md` and `skills/` |
+| `shared/` | Content every tool reads in the same format, linked into each: `skills/pr-review` (post inline findings on a GitHub PR, resolve verified fixes, approve or request changes) |
 | `links/<tool>.links` | One line per link: `<path in repo>  <link to create>` |
 | `scripts/` | `install.ps1`, `install.sh`, `check-secrets.sh` |
 

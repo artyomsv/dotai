@@ -1,7 +1,7 @@
 ---
-allowed-tools: Bash(git:*), Read, Glob, Grep, Agent, SendMessage, Write
-description: Code review orchestrator — spawns security-officer, code-reviewer, rules-compliance, and qa agents in parallel and produces a combined report. Tracks per-service-and-feature review state across rounds.
-argument-hint: [--staged | --all | --branch | path] [--severity=high|medium|all] [--service=<name>] [--feature=<slug>] [--force-round] [--full-sweep] [--with-it]
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(node:*), Read, Glob, Grep, Agent, SendMessage, Write
+description: Code review orchestrator — spawns security-officer, code-reviewer, rules-compliance, and qa agents in parallel and produces a combined report. Tracks per-service-and-feature review state across rounds. On a pull request it posts inline findings, resolves verified fixes, and gives a verdict.
+argument-hint: [--pr <n> | --staged | --all | --branch | path] [--local-only] [--severity=high|medium|all] [--service=<name>] [--feature=<slug>] [--force-round] [--full-sweep] [--with-it]
 ---
 
 # Review All (Orchestrator)
@@ -12,6 +12,8 @@ Named `/review-all`, not `/code-review`, so it does not shadow the built-in `/co
 
 ## Arguments (all optional)
 - no scope flag - Auto (default): see "Scope resolution" in step 2
+- `--pr <n>` (or a bare PR number or PR URL) - Review a GitHub pull request, then register the review on it (step 8)
+- `--local-only` - With `--pr`: review, but post nothing to GitHub
 - `--staged` - Review only staged changes
 - `--all` - Review all uncommitted changes: staged + unstaged + untracked
 - `--branch` - Review everything on this branch since it forked from `origin/master`, including uncommitted and untracked files
@@ -121,13 +123,15 @@ Print the resolved `(service, feature)` pair at the top of the report. Do not st
 
 If `--force-round` was passed, run normally and prepend the same warning to the final report.
 
+**Exception for pull requests.** With `--pr`, the cap never blocks verifying fixes: when it is reached and the PR has open agent threads, run in **verify-only mode** instead of stopping — agents verify the open threads and report a new finding only if it is CRITICAL or HIGH and sits in lines changed since `lastReview.head`. Say "verify-only mode (round cap)" in the report.
+
 The `.claude/reviews/` directory is project-local and SHOULD be committed (review state survives across collaborators). Do not gitignore it.
 
 ## Your Task
 
 ### 1. Parse Arguments
 
-Identify scope, severity filter, service, feature slug, `--force-round`, `--full-sweep` and `--with-it` from: $ARGUMENTS
+Identify scope (including `--pr`), `--local-only`, severity filter, service, feature slug, `--force-round`, `--full-sweep` and `--with-it` from: $ARGUMENTS
 - Default scope: auto (see "Scope resolution" in step 2)
 - Default severity: `--severity=all`
 - Default service: derive per the service-derivation order above.
@@ -150,6 +154,10 @@ Based on scope:
 - `--all`: File list is `git diff HEAD --name-only` (staged + unstaged — plain `git diff` shows unstaged only) plus `git ls-files --others --exclude-standard` (untracked). Diff summary is `git diff HEAD --stat`; list untracked files under it by name. The **ref under review** is the working tree on disk.
 - `path`: Use the specified path directly. The **ref under review** is the working tree on disk.
 - `--branch`: Compute the fork point ONCE and pin it as a SHA: `BASE=$(git merge-base origin/master HEAD)` (fall back to `origin/main`; use local `master` only if no remote ref exists, and say so in the report — a local `master` that was never pulled drags other people's commits into the diff). Do not `git fetch`. File list is `git diff $BASE --name-only` (commits + staged + unstaged) plus `git ls-files --others --exclude-standard`; diff summary is `git diff $BASE --stat`. Pass `$BASE` to the agents as the SHA, never as `origin/master` — another worktree's fetch can move that ref mid-review. The **ref under review** is `HEAD` (`git show HEAD:<path>`) when the tree is clean, else the working tree on disk.
+
+- `--pr <n>`: `gh pr view <n> --json number,title,body,headRefName,headRefOid,baseRefName,baseRefOid,url`. Pin `HEAD_SHA=<headRefOid>`. If `git cat-file -e $HEAD_SHA` fails, `git fetch origin $HEAD_SHA` (it only updates `FETCH_HEAD`; never check out or switch branches). `BASE=$(git merge-base <baseRefOid> $HEAD_SHA)`. File list is `git diff $BASE $HEAD_SHA --name-only`; diff summary is `git diff $BASE $HEAD_SHA --stat`. The **ref under review** is `$HEAD_SHA` (`git show $HEAD_SHA:<path>`), whatever is checked out. The feature slug is derived from `headRefName`. Pass the PR title and body to every agent: intent defines what "wrong" means.
+
+  Then read `~/.claude/skills/pr-review/SKILL.md` and run its `status` command. If it lists agent threads, this is a **PR re-review**: build an `<open-pr-findings>` block listing every open agent thread (`threadId`, `id`, `severity`, `path`, `line`), add `lastReview.head`, and ask the agents to review the changes since that head with the most care (`git diff <lastReview.head> $HEAD_SHA`). The existing thread ids are taken: new findings continue the numbering.
 
 **Exclude** files matching patterns in the "Excluded Files" section above.
 
@@ -220,6 +228,8 @@ Deliver your findings as text with file:line references and inline patch suggest
 ### 5. Spawn All Four Agents in Parallel
 
 Use the **Agent tool** to launch all four agents **simultaneously in a single message** (four parallel Agent calls). Do not pass `model`. Pass each agent the gathered context AND the `<review-contract>` block AND the `<prior-review-state>` block AND (when round ≥ 2) the diminishing-returns instruction so they don't need to re-discover changes and don't re-raise resolved items.
+
+On a PR re-review, also pass every agent the `<open-pr-findings>` block with this instruction: "Verify each open thread whose id starts with your lens (`security/` → security-officer, `code-quality/` → code-reviewer, `rules/` → rules-compliance, `qa/` → qa) at the ref under review. For each, return `threadId`, `fixed` (true/false) and one sentence of evidence: the file:line of the fix, and the test that proves it when one exists. The author's word is not evidence. Do not re-raise a thread as a new finding." In verify-only mode, send only this block and instruction, plus the CRITICAL/HIGH-only rule for new findings.
 
 #### Agent A: security-officer
 
@@ -382,6 +392,16 @@ The Write tool creates the `.claude/reviews/<service>/` directory if it does not
 
 If the user dismisses specific items, capture their stated reason verbatim in the Dismissed entry.
 
+### 8. Register the review on the pull request (`--pr` only)
+
+Skip this step with `--local-only`. Otherwise follow `~/.claude/skills/pr-review/SKILL.md`, running `node ~/.claude/skills/pr-review/scripts/pr-review.mjs <command> --repo <owner/name> --pr <n>`:
+
+1. **Resolve** (re-review only): write the agents' verifications to `{scratchpad}/pr-<n>-verifications.json` and run `resolve`. A thread whose agent did not return a verdict is left untouched and listed in the report.
+2. **Post**: write every Action Item that is not already an open thread to `{scratchpad}/pr-<n>-findings.json`: id `<lens>/<C|H|M|L>-<n>` (lens is `security`, `code-quality`, `rules` or `qa`; continue the numbering past existing thread ids), severity, path, line in `$HEAD_SHA`, title, and a body with the scenario and the fix. The summary is the report's Summary section in two to five sentences. Run `post`, even with zero findings: a clean review is still a registered review.
+3. **Verdict**: `request-changes` if any CRITICAL, HIGH or MEDIUM finding is open after steps 1 and 2, else `approve`. If `approve` is refused (open blocking thread, or failing or pending CI), post `request-changes` only when a finding blocks; when only CI is pending, report that and post no verdict. Never pass `--force` unless the user said so.
+
+Add to the top of the report: the review URL, threads posted and resolved, the verdict, and whether it was a real Approve/Request changes or the comment fallback (reviewer account = PR author).
+
 ## Rules
 
 - **Always spawn all four agents in parallel** — use a single message with four Agent tool calls
@@ -389,7 +409,8 @@ If the user dismisses specific items, capture their stated reason verbatim in th
 - **Pass context to agents** — agents should not need to re-run git commands for file discovery
 - **Always inject the `<review-contract>` block** into every agent prompt
 - **Always inject the `<prior-review-state>` block** into every agent prompt, even when the state file does not yet exist (in that case the block is empty but its presence anchors the agents' attention on the convention)
-- **Honour the round cap** — `Rounds completed >= 2` without `--force-round` means no agents are spawned
+- **Honour the round cap** — `Rounds completed >= 2` without `--force-round` means no agents are spawned, except verify-only mode on a PR with open agent threads
+- **On a PR, register the review** (step 8) unless `--local-only`; never merge, close, dismiss reviews, or touch threads a person opened
 - **Honour the diminishing-returns instruction on round ≥ 2** — pass it to every agent
 - **Do not duplicate agent work** — do not perform your own code analysis; rely on the agents
 - **Respect severity filter** — when consolidating, filter the final Action Items list by the requested severity level

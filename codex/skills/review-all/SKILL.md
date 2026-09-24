@@ -27,6 +27,10 @@ after every lens reports what it checked.
 
 Read the PR body and linked issue (`Ref #N`): intent defines what "wrong" means.
 
+For a PR, run the `$pr-review` skill's `status` first. If it lists agent threads, this is a
+re-review: verify every open agent thread at the new head (the `$pr-review` re-review steps), and
+review what changed since `lastReview.head` in full with the lenses below.
+
 ## 2. Load the context the Claude reviewers get automatically
 
 1. Root `CLAUDE.md` and the `CLAUDE.md` of every service the diff touches.
@@ -115,5 +119,9 @@ Scenario: ...   Fix: ...
 <what you could not verify and why>
 ```
 
-Post to GitHub only when the user asks you to register or post the review; then follow
-[references/github-posting.md](references/github-posting.md).
+## 7. Register the review on the pull request
+
+When the target is a PR, register the review with the `$pr-review` skill unless the user said
+"local only": the findings above become its findings file (same ids, severities, paths and lines;
+the body carries the scenario and the fix), then `post`, `resolve` on a re-review, and `verdict`.
+Add the review and verdict URLs to the report.
