@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review All"
+  short_description: "Four-lens review with the repo's rules and lessons"
+  default_prompt: "Use $review-all to review the requested change and report every actionable finding."

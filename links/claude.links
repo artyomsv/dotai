@@ -1,0 +1,8 @@
+# Claude Code: <path in this repo>  <link to create>
+# A folder listed here is owned by dotai as a whole. For a folder the tool also writes into
+# (like ~/.claude/skills), list each subfolder instead.
+claude/agents          ~/.claude/agents
+claude/commands        ~/.claude/commands
+claude/rules           ~/.claude/rules
+claude/hooks           ~/.claude/hooks
+claude/output-styles   ~/.claude/output-styles

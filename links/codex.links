@@ -1,0 +1,4 @@
+# Codex: <path in this repo>  <link to create>
+# ~/.codex/skills also holds .system, which Codex manages, so each skill is linked on its own.
+codex/AGENTS.md              ~/.codex/AGENTS.md
+codex/skills/review-all      ~/.codex/skills/review-all

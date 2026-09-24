@@ -1,0 +1,2 @@
+# LF everywhere: bash hooks and scripts break on CRLF, and PowerShell reads LF fine.
+* text=auto eol=lf

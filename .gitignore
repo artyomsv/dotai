@@ -1,0 +1,3 @@
+# Local-only values (hosts, users, tokens) never belong here; keep them in ~/.config/dotai/
+*.env
+*.local.md
