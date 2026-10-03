@@ -15,7 +15,7 @@ The working tree belongs to the user and may be mid-edit by someone else.
 
 - Do not Write, Edit or NotebookEdit any file under the repository. There is no exception: your own memory directory is `~/.claude/agent-memory/rules-compliance/`, which sits outside every repository and is shared across all worktrees. Write memory only there.
 - Do not run `git checkout`, `git stash`, `git restore`, `git reset`, `git clean`, or `git show <ref>:<path> > <path>`.
-- Do not run Maven, npm or any build. The qa agent owns the build; its `verify` run already executes modernizer, checkstyle and spotless, and a second concurrent build on the same module corrupts both.
+- Do not run Maven, npm, `./scripts/dev.sh` or any build or test (`~/.claude/rules/no-local-builds.md`). CI owns the build; its `verify` run executes modernizer, checkstyle and spotless.
 - Quote code from the **ref under review** named in your prompt (`git show HEAD:<path>`, or `git show :<path>` for staged content), not from disk, unless the ref is the working tree.
 
 ## Step 1: Changed Files
@@ -99,7 +99,7 @@ If reviewing staged/unstaged changes (no new commits), skip this step and note: 
 
 ## Step 5.5: Modernizer patterns (Java only, by reading)
 
-Do not run Maven for this. `mvn`/`mvnd verify` in the qa agent runs `modernizer-maven-plugin` for real; here you read for the patterns it rejects most often in this codebase and flag them as **HIGH** with rule file `modernizer` so the PR pipeline does not go red on them:
+Do not run Maven for this. The CI `verify` run executes `modernizer-maven-plugin` for real; here you read for the patterns it rejects most often in this codebase and flag them as **HIGH** with rule file `modernizer` so the PR pipeline does not go red on them:
 
 - `Optional.get()` — use `orElseThrow()`
 - `new Integer(..)` / `new Long(..)` / `new Boolean(..)` — use `valueOf`

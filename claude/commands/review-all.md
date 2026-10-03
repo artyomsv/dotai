@@ -1,7 +1,7 @@
 ---
 allowed-tools: Bash(git:*), Bash(gh:*), Bash(node:*), Read, Glob, Grep, Agent, SendMessage, Write
 description: Code review orchestrator — spawns security-officer, code-reviewer, rules-compliance, and qa agents in parallel and produces a combined report. Tracks per-service-and-feature review state across rounds. On a pull request it posts inline findings, resolves verified fixes, and gives a verdict.
-argument-hint: [--pr <n> | --staged | --all | --branch | path] [--local-only] [--severity=high|medium|all] [--service=<name>] [--feature=<slug>] [--force-round] [--full-sweep] [--with-it]
+argument-hint: [--pr <n> | --staged | --all | --branch | path] [--local-only] [--severity=high|medium|all] [--service=<name>] [--feature=<slug>] [--force-round] [--full-sweep]
 ---
 
 # Review All (Orchestrator)
@@ -25,7 +25,6 @@ Named `/review-all`, not `/code-review`, so it does not shadow the built-in `/co
 - `--feature=<slug>` - Override the auto-derived feature slug. Use this when reviewing multiple features against the same service on the same branch.
 - `--force-round` - Run even when the state file already shows `Rounds completed: 2` or more (see "Round cap").
 - `--full-sweep` - Ask security-officer to scan ALL tracked files for leaked secrets/topology, not just the changed files. Slow. Off by default.
-- `--with-it` - Let qa run the failsafe `*IT` integration tests. Off by default because they are slow; without it qa runs `verify -DskipITs` and lists the ITs as not run.
 
 Arguments can be in any order.
 
@@ -40,7 +39,7 @@ Current values, for reference only (edit the agent file, not this table):
 | security-officer | opus | high | Vulnerabilities, secrets, tenant-isolation chain, Semgrep |
 | code-reviewer | opus | high | Bugs, edge cases, design, readability |
 | rules-compliance | opus | high | `.claude/rules/` + `~/.claude/rules/` conformance |
-| qa | opus | high | Test coverage, test-pattern compliance, runs the build |
+| qa | opus | high | Test coverage, test-pattern compliance, reads the CI result |
 
 ## Excluded Files (auto-detected)
 
@@ -131,7 +130,7 @@ The `.claude/reviews/` directory is project-local and SHOULD be committed (revie
 
 ### 1. Parse Arguments
 
-Identify scope (including `--pr`), `--local-only`, severity filter, service, feature slug, `--force-round`, `--full-sweep` and `--with-it` from: $ARGUMENTS
+Identify scope (including `--pr`), `--local-only`, severity filter, service, feature slug, `--force-round` and `--full-sweep` from: $ARGUMENTS
 - Default scope: auto (see "Scope resolution" in step 2)
 - Default severity: `--severity=all`
 - Default service: derive per the service-derivation order above.
@@ -216,8 +215,8 @@ Ref under review: {ref-under-review}. Quote code from that ref (e.g. `git show H
 The working tree belongs to the user and may be mid-edit. You are read-only:
 - Do not Write, Edit or NotebookEdit any file under the repository. There is no exception: your memory directory is `~/.claude/agent-memory/<your-agent-name>/`, outside every repository.
 - Do not run `git checkout`, `git stash`, `git restore`, `git reset`, `git clean`, or `git show <ref>:<path> > <path>`.
-- Do not run a build or test command that shares a `target/`, `node_modules/` or `dist/` directory with another agent's build. qa is the only agent that runs Maven or npm.
-- If you want to probe a change (revert a fix and re-run a test, mutate a line, run Semgrep on a worktree), copy the files or the module into `{scratchpad}` and probe the copy there. Never in the worktree.
+- Do not run any build, test or lint command on the host — Maven, npm, vitest, `./scripts/dev.sh` included (`~/.claude/rules/no-local-builds.md`). CI runs them; qa reads the result.
+- If you want to probe a change (revert a fix, mutate a line), reason about it; do not build. A Semgrep scan is not a build: copy the files into `{scratchpad}` and scan the copy there. Never in the worktree.
 
 Deliver your findings as text with file:line references and inline patch suggestions. End with the full report as your final message. If you are running as an agent-team teammate, also send the report to the lead with SendMessage — a bare "idle" is not a report.
 </review-contract>
@@ -291,8 +290,7 @@ Prompt must include:
 - The `<review-contract>` block
 - The `<prior-review-state>` block
 - (When round ≥ 2) the diminishing-returns instruction
-- `--with-it` flag state: "Integration tests: ON" or "Integration tests: OFF — run `verify -DskipITs` and list the ITs as not run."
-- Instruction: "Verify test coverage and run tests for these changed files. You do NOT need to run git commands to discover files — use the file list provided. Do NOT re-raise items listed in <prior-review-state>. Run module builds one at a time, never two in parallel. Pass `-Dspotless.apply.skip=true` to every Maven build so the build cannot rewrite the user's sources. Report exactly which modules and test phases ran."
+- Instruction: "Verify test coverage for these changed files and read the CI result for the ref under review. You do NOT need to run git commands to discover files — use the file list provided. Do NOT re-raise items listed in <prior-review-state>. Do not run any build or test on the host. Report exactly which CI checks you read and the commit they ran on."
 
 ### 6. Wait for all four, then combine
 

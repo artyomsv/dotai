@@ -80,17 +80,15 @@ lenses both found into one entry naming both.
 
 ## 4. Build and test (tests-and-build lens only)
 
-Read first, build second: do not let a long build or a browser probe replace reading the diff.
+Do not run any build, test or lint on the host — Maven, npm, vitest, `./scripts/dev.sh` included
+(`~/.claude/rules/no-local-builds.md`). CI runs them on every pull request; read its result.
 
-- Maven is `E:\Tools\mvnd\bin\mvnd.exe` (no `mvn`, no `mvnw`). Always `clean`: without it, stale
-  `target/test-classes` hides compile errors in untouched tests.
-- Always pass `-Dspotless.apply.skip=true`; otherwise the build reformats the author's sources.
-- Pass `-DskipITs` unless the user asked for integration tests. If failsafe runs and every
-  `@IntegrationTest` errors on a Docker-environment lookup (e.g. "Previous attempts to find a Docker
-  environment failed", followed by a cascade of `BeanCreationException`s), report the ITs as
-  "not run: no Docker", not as a failure of the change.
-- Frontend: `npm test` / `npx vitest run` from PowerShell in the gateway directory.
-- One build at a time. Report exactly which modules and phases ran, with the counts you read in the log.
+- `gh pr view --json number,headRefOid,statusCheckRollup`; the result counts only when
+  `headRefOid` is the reviewed ref.
+- Running checks: `gh pr checks <n> --watch`. Red checks: `gh run view <run-id> --log-failed`.
+- Report which checks you read, their commit, and the test counts from the job log.
+- No pull request or no workflow for the changed module: report "not run: no CI result for <sha>".
+  Do not build locally to fill the gap.
 
 ## 5. Stay read-only
 

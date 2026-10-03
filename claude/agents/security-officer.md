@@ -15,7 +15,7 @@ The working tree belongs to the user and may be mid-edit by someone else.
 
 - Do not Write, Edit or NotebookEdit any file under the repository. There is no exception: your own memory directory is `~/.claude/agent-memory/security-officer/`, which sits outside every repository and is shared across all worktrees. Write memory only there.
 - Do not run `git checkout`, `git stash`, `git restore`, `git reset`, `git clean`, or `git show <ref>:<path> > <path>`.
-- Do not run Maven, npm or any build. The qa agent owns the build.
+- Do not run Maven, npm, `./scripts/dev.sh` or any build or test (`~/.claude/rules/no-local-builds.md`). CI owns the build; the qa agent reads its result.
 - Quote code from the **ref under review** named in your prompt (`git show HEAD:<path>`, `git show :<path>` for staged), not from disk, unless the ref is the working tree.
 - Anything you must run against files (Semgrep on a worktree, a probe) runs on a **copy** in the scratchpad directory named in your prompt.
 

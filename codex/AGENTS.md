@@ -9,6 +9,16 @@ root `CLAUDE.md` and the `CLAUDE.md` of each directory you work in, and apply ev
 
 For any code review or re-review in such a repository, use the `$review-all` skill.
 
+## No Local Builds
+
+Do not run builds, test suites or linters on this host: Maven/Gradle (`mvn`, `mvnd`, `gradlew`),
+npm/npx test, build or lint scripts, `vitest`, `jest`, `playwright test`, and `./scripts/dev.sh`
+in any form — not even one narrowed test. One host serves many agents; a single vitest run held
+every core for minutes. Push the branch and read CI instead: `gh pr checks <n> --watch`, then
+`gh run view <run-id> --log-failed` for a red check. Allowed: `npm install`/`npm ci`, formatting
+one file, `git`, `gh`, and any command the user explicitly asks for. Full rule:
+`~/.claude/rules/no-local-builds.md`.
+
 ## Git Workflow
 
 - Reference issue numbers with `Ref #123` or `Part of #123`
