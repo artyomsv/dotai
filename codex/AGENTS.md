@@ -9,6 +9,23 @@ root `CLAUDE.md` and the `CLAUDE.md` of each directory you work in, and apply ev
 
 For any code review or re-review in such a repository, use the `$review-all` skill.
 
+## Pull Request Review Labels
+
+A pull request carries exactly one label: `review: requested` (waits for a reviewer),
+`review: changes-requested` (waits for the author) or `review: approved` (a person may merge).
+The reviewer sets the verdict labels through the `$pr-review` skill.
+
+As the author, set `review: requested` after you open a pull request (a draft: when you mark it
+ready), after you push fixes for review findings, and after you answer the reviewer's findings or
+questions in comments:
+
+```bash
+node ~/.codex/skills/pr-review/scripts/pr-review.mjs request-review --pr <n>
+```
+
+It creates the label when missing and removes the other two. Never run it as the reviewer.
+Full rule: `~/.claude/rules/pr-review-labels.md`.
+
 ## No Local Builds
 
 Do not run builds, test suites or linters on this host: Maven/Gradle (`mvn`, `mvnd`, `gradlew`),

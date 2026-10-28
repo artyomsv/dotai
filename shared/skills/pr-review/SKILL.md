@@ -66,7 +66,27 @@ says so ("local only", "don't post").
 - Reviewer account ≠ PR author: a real GitHub **Approve** or **Request changes**.
 - Reviewer account = PR author: GitHub forbids both, so the verdict is a comment headed
   "✅ APPROVED" or "❌ CHANGES REQUESTED".
-- Always: the label `review: approved` or `review: changes-requested` (the other one is removed).
+- Always: the label `review: approved` or `review: changes-requested`. The other review labels,
+  `review: requested` among them, are removed.
+
+## Review labels
+
+A pull request carries exactly one `review: …` label. It tells everyone who acts next.
+
+| Label | Set by | Means |
+|---|---|---|
+| `review: requested` | the author agent, with `request-review` | the code waits for a reviewer |
+| `review: changes-requested` | the reviewer, with `verdict` | the code waits for the author |
+| `review: approved` | the reviewer, with `verdict` | a person may merge |
+
+The author agent runs `request-review` after each of these, even without this skill loaded:
+
+- it opens a pull request (a draft gets the label when it is marked ready);
+- it pushes fixes for review findings;
+- it answers the reviewer's findings or questions in comments, with or without new code.
+
+`request-review` creates the label when the repository lacks it and removes the other two. The
+reviewer never runs it.
 
 ## Never
 

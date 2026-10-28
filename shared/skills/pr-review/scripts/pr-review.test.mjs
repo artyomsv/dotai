@@ -3,7 +3,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   commentableLines, anchor, marker, parseMarker, validateFindings, findingComment, reviewEvent, approvalBlockers,
+  labelChange,
 } from './pr-review.mjs';
+
+test('labelChange sets one review label and removes the other two', () => {
+  assert.deepEqual(labelChange('requested'), {
+    add: { name: 'review: requested', color: 'fbca04', description: 'Waiting for a code review' },
+    remove: ['review: approved', 'review: changes-requested'],
+  });
+  assert.equal(labelChange('approve').add.name, 'review: approved');
+  assert.deepEqual(labelChange('approve').remove, ['review: changes-requested', 'review: requested']);
+  assert.deepEqual(labelChange('request-changes').remove, ['review: approved', 'review: requested']);
+  assert.throws(() => labelChange('merged'), /unknown review state/);
+});
 
 const PATCH = [
   '@@ -1,3 +1,4 @@',

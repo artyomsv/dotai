@@ -6,6 +6,10 @@
 //   pr-review.mjs status  [--repo o/r] [--pr n] [--all]
 //   pr-review.mjs resolve --verifications <file.json> [--sha <sha>] [--repo o/r] [--pr n] [--dry-run]
 //   pr-review.mjs verdict --decision approve|request-changes [--body-file <file.md>] [--force] [--repo o/r] [--pr n] [--dry-run]
+//   pr-review.mjs request-review [--repo o/r] [--pr n] [--dry-run]
+//
+// One `review: …` label says where a pull request stands. The author agent sets `requested` when
+// the pull request needs a review; the reviewer agent sets `approved` or `changes-requested`.
 //
 // Every comment the agents write carries a hidden marker, so any agent account can find and
 // resolve the threads another agent account opened, and never touches threads people wrote.
@@ -19,7 +23,9 @@ export const BLOCKING = new Set(['CRITICAL', 'HIGH', 'MEDIUM']);
 export const LABELS = {
   approve: { name: 'review: approved', color: '0e8a16', description: 'Agent review verdict: approved' },
   'request-changes': { name: 'review: changes-requested', color: 'd93f0b', description: 'Agent review verdict: changes requested' },
+  requested: { name: 'review: requested', color: 'fbca04', description: 'Waiting for a code review' },
 };
+export const DECISIONS = ['approve', 'request-changes'];
 
 // ---------- pure helpers (unit-tested) ----------
 
@@ -86,6 +92,12 @@ export function findingComment(f, movedFrom) {
   const where = movedFrom ? `\`${movedFrom.path}${movedFrom.line ? `:${movedFrom.line}` : ''}\`` : '';
   const moved = movedFrom ? `_About ${where}, which is outside the diff; anchored here so the finding can be tracked._\n\n` : '';
   return `**[${f.id}] ${f.severity}** — ${f.title}\n\n${moved}${f.body}\n\n${marker({ kind: 'finding', id: f.id, severity: f.severity })}`;
+}
+
+/** The label to add for a review state, and the other review labels to remove: only one is ever set. */
+export function labelChange(state) {
+  if (!LABELS[state]) throw new Error(`unknown review state ${state}`);
+  return { add: LABELS[state], remove: Object.keys(LABELS).filter(k => k !== state).map(k => LABELS[k].name) };
 }
 
 /** GitHub refuses APPROVE and REQUEST_CHANGES on your own pull request; fall back to COMMENT. */
@@ -175,6 +187,19 @@ function checks(ctx) {
 
 function ensureLabel(ctx, label) {
   try { send('POST', `repos/${ctx.repo}/labels`, label); } catch (e) { if (e.status !== '422') throw e; }
+}
+
+/** Sets the label of a review state and removes the other review labels. Returns a note, never throws. */
+function setReviewLabel(ctx, state) {
+  const { add, remove } = labelChange(state);
+  try {
+    ensureLabel(ctx, add);
+    send('POST', `repos/${ctx.repo}/issues/${ctx.number}/labels`, { labels: [add.name] });
+    for (const name of remove) {
+      try { gh(['api', '-X', 'DELETE', `repos/${ctx.repo}/issues/${ctx.number}/labels/${encodeURIComponent(name)}`]); } catch (e) { if (e.status !== '404') throw e; }
+    }
+    return 'label set';
+  } catch (e) { return `label not set: ${e.message}`; }
 }
 
 // ---------- commands ----------
@@ -267,7 +292,7 @@ function resolve(opts) {
 
 function verdict(opts) {
   const decision = opts.decision;
-  if (!LABELS[decision]) throw new Error('--decision must be approve or request-changes');
+  if (!DECISIONS.includes(decision)) throw new Error('--decision must be approve or request-changes');
   const ctx = context(opts);
   const all = threads(ctx);
   const ci = checks(ctx);
@@ -291,14 +316,18 @@ function verdict(opts) {
   if (opts['dry-run']) return { status: 'dry-run', event, body, label: LABELS[decision].name };
 
   const r = send('POST', `repos/${ctx.repo}/pulls/${ctx.number}/reviews`, { commit_id: ctx.head, event, body });
-  const other = decision === 'approve' ? 'request-changes' : 'approve';
-  let labelNote = 'label set';
-  try {
-    ensureLabel(ctx, LABELS[decision]);
-    send('POST', `repos/${ctx.repo}/issues/${ctx.number}/labels`, { labels: [LABELS[decision].name] });
-    try { gh(['api', '-X', 'DELETE', `repos/${ctx.repo}/issues/${ctx.number}/labels/${encodeURIComponent(LABELS[other].name)}`]); } catch (e) { if (e.status !== '404') throw e; }
-  } catch (e) { labelNote = `label not set: ${e.message}`; }
+  const labelNote = setReviewLabel(ctx, decision);
   return { status: 'posted', event, review: r.html_url, label: LABELS[decision].name, labelNote, forced: Boolean(opts.force && decision === 'approve' && (blockers.openFindings.length || blockers.failingChecks.length)) };
+}
+
+/** The author side: the pull request is new, has fixes pushed, or has answers for the reviewer. */
+function requestReview(opts) {
+  const ctx = context(opts);
+  const { add, remove } = labelChange('requested');
+  if (opts['dry-run']) return { status: 'dry-run', label: add.name, remove };
+  const labelNote = setReviewLabel(ctx, 'requested');
+  if (labelNote !== 'label set') throw new Error(labelNote);
+  return { status: 'requested', pr: ctx.pr.html_url, head: ctx.head, label: add.name, removed: remove };
 }
 
 // ---------- entry point ----------
@@ -316,9 +345,9 @@ function parseArgs(argv) {
 
 function main() {
   const { command, opts } = parseArgs(process.argv.slice(2));
-  const commands = { post, status, resolve, verdict };
+  const commands = { post, status, resolve, verdict, 'request-review': requestReview };
   if (!commands[command]) {
-    console.error('usage: pr-review.mjs post|status|resolve|verdict [options] (see the header of this file)');
+    console.error('usage: pr-review.mjs post|status|resolve|verdict|request-review [options] (see the header of this file)');
     process.exit(2);
   }
   try {
