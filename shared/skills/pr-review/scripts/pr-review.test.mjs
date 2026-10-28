@@ -3,17 +3,27 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   commentableLines, anchor, marker, parseMarker, validateFindings, findingComment, reviewEvent, approvalBlockers,
-  labelChange,
+  labelChange, approveOutcome,
 } from './pr-review.mjs';
+
+test('approveOutcome: approve when clear, wait on running checks, ci-failed on a red check, refused on a finding', () => {
+  const pending = { name: 'build', bucket: 'pending' };
+  const failed = { name: 'lint', bucket: 'fail' };
+  const finding = { id: 'h', severity: 'HIGH' };
+  assert.equal(approveOutcome({ openFindings: [], failingChecks: [] }), 'approve');
+  assert.equal(approveOutcome({ openFindings: [], failingChecks: [pending] }), 'wait');
+  assert.equal(approveOutcome({ openFindings: [], failingChecks: [pending, failed] }), 'ci-failed');
+  assert.equal(approveOutcome({ openFindings: [finding], failingChecks: [failed] }), 'refused');
+});
 
 test('labelChange sets one review label and removes the other two', () => {
   assert.deepEqual(labelChange('requested'), {
     add: { name: 'review: requested', color: 'fbca04', description: 'Waiting for a code review' },
-    remove: ['review: approved', 'review: changes-requested'],
+    remove: ['review: approved', 'review: changes-requested', 'review: ci-failed'],
   });
   assert.equal(labelChange('approve').add.name, 'review: approved');
-  assert.deepEqual(labelChange('approve').remove, ['review: changes-requested', 'review: requested']);
-  assert.deepEqual(labelChange('request-changes').remove, ['review: approved', 'review: requested']);
+  assert.deepEqual(labelChange('approve').remove, ['review: changes-requested', 'review: ci-failed', 'review: requested']);
+  assert.deepEqual(labelChange('ci-failed').remove, ['review: approved', 'review: changes-requested', 'review: requested']);
   assert.throws(() => labelChange('merged'), /unknown review state/);
 });
 

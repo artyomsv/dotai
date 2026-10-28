@@ -5,11 +5,12 @@
 //   pr-review.mjs post    --findings <file.json> [--repo o/r] [--pr n] [--force] [--dry-run]
 //   pr-review.mjs status  [--repo o/r] [--pr n] [--all]
 //   pr-review.mjs resolve --verifications <file.json> [--sha <sha>] [--repo o/r] [--pr n] [--dry-run]
-//   pr-review.mjs verdict --decision approve|request-changes [--body-file <file.md>] [--force] [--repo o/r] [--pr n] [--dry-run]
+//   pr-review.mjs verdict --decision approve|request-changes [--body-file <file.md>] [--force] [--wait-minutes 15] [--no-wait] [--repo o/r] [--pr n] [--dry-run]
 //   pr-review.mjs request-review [--repo o/r] [--pr n] [--dry-run]
 //
 // One `review: …` label says where a pull request stands. The author agent sets `requested` when
-// the pull request needs a review; the reviewer agent sets `approved` or `changes-requested`.
+// the pull request needs a review; the reviewer agent sets `approved`, `changes-requested`, or
+// `ci-failed` (the review found nothing blocking, but CI fails).
 //
 // Every comment the agents write carries a hidden marker, so any agent account can find and
 // resolve the threads another agent account opened, and never touches threads people wrote.
@@ -23,6 +24,7 @@ export const BLOCKING = new Set(['CRITICAL', 'HIGH', 'MEDIUM']);
 export const LABELS = {
   approve: { name: 'review: approved', color: '0e8a16', description: 'Agent review verdict: approved' },
   'request-changes': { name: 'review: changes-requested', color: 'd93f0b', description: 'Agent review verdict: changes requested' },
+  'ci-failed': { name: 'review: ci-failed', color: 'b60205', description: 'Agent review passed, but CI fails' },
   requested: { name: 'review: requested', color: 'fbca04', description: 'Waiting for a code review' },
 };
 export const DECISIONS = ['approve', 'request-changes'];
@@ -112,6 +114,18 @@ export function approvalBlockers(threads, checks) {
     openFindings: threads.filter(t => t.agent && !t.isResolved && BLOCKING.has(t.severity)),
     failingChecks: checks.filter(c => c.bucket !== 'pass' && c.bucket !== 'skipping'),
   };
+}
+
+/**
+ * What an approve request turns into: `approve`; `wait` while the only blockers are running checks;
+ * `ci-failed` when the review found nothing blocking but a check failed; `refused` while a blocking
+ * finding is open (the reviewer requests changes for that instead).
+ */
+export function approveOutcome(blockers) {
+  if (blockers.openFindings.length) return 'refused';
+  if (!blockers.failingChecks.length) return 'approve';
+  if (blockers.failingChecks.every(c => c.bucket === 'pending')) return 'wait';
+  return 'ci-failed';
 }
 
 // ---------- GitHub access through gh ----------
@@ -290,24 +304,53 @@ function resolve(opts) {
   return { head: sha, results };
 }
 
+const HEADERS = { approve: '## ✅ APPROVED', 'request-changes': '## ❌ CHANGES REQUESTED', 'ci-failed': '## ❌ CI FAILED' };
+
 function verdict(opts) {
-  const decision = opts.decision;
+  let decision = opts.decision;
   if (!DECISIONS.includes(decision)) throw new Error('--decision must be approve or request-changes');
   const ctx = context(opts);
   const all = threads(ctx);
-  const ci = checks(ctx);
-  const blockers = approvalBlockers(all, ci);
-  if (decision === 'approve' && (blockers.openFindings.length || blockers.failingChecks.length) && !opts.force) {
-    return {
-      status: 'refused', reason: 'cannot approve yet',
-      openFindings: blockers.openFindings.map(t => `${t.id} ${t.url}`),
-      failingChecks: blockers.failingChecks.map(c => `${c.name}: ${c.bucket}`),
-    };
+  let ci = checks(ctx);
+  let blockers = approvalBlockers(all, ci);
+  if (decision === 'approve' && !opts.force) {
+    if (!opts['no-wait'] && approveOutcome(blockers) === 'wait') {
+      // Only running checks stand between the review and an approval: wait for them here, so the
+      // verdict and its label are posted instead of a bare "approved" report.
+      const deadline = Date.now() + Number(opts['wait-minutes'] ?? 15) * 60_000;
+      while (approveOutcome(blockers) === 'wait' && Date.now() < deadline) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 30_000);
+        ci = checks(ctx);
+        blockers = approvalBlockers(all, ci);
+      }
+      const head = get(`repos/${ctx.repo}/pulls/${ctx.number}`).head.sha;
+      if (head !== ctx.head) {
+        return { status: 'refused', reason: `new commits arrived while waiting for CI (${ctx.head.slice(0, 10)} → ${head.slice(0, 10)}); re-review them first` };
+      }
+    }
+    const outcome = approveOutcome(blockers);
+    if (outcome === 'wait') {
+      return {
+        status: 'refused', reason: 'checks still running; run verdict again to keep waiting',
+        pendingChecks: blockers.failingChecks.map(c => `${c.name}: ${c.bucket}`),
+      };
+    }
+    if (outcome === 'refused') {
+      return {
+        status: 'refused', reason: 'cannot approve yet',
+        openFindings: blockers.openFindings.map(t => `${t.id} ${t.url}`),
+        failingChecks: blockers.failingChecks.map(c => `${c.name}: ${c.bucket}`),
+      };
+    }
+    decision = outcome;
   }
   const event = reviewEvent(decision, ctx.reviewer, ctx.author);
   const agentThreads = all.filter(t => t.agent);
   const open = agentThreads.filter(t => !t.isResolved);
-  const header = decision === 'approve' ? '## ✅ APPROVED' : '## ❌ CHANGES REQUESTED';
+  const failedText = decision === 'ci-failed'
+    ? `\n\nThe code review found nothing blocking, but CI fails. Fix these checks, then request a review again:\n${blockers.failingChecks.map(c => `- ${c.name}: ${c.bucket}`).join('\n')}`
+    : '';
+  const header = `${HEADERS[decision]}${failedText}`;
   const selfNote = event === 'COMMENT' ? '\n\n_Posted as a comment: GitHub does not let an account approve or request changes on its own pull request. The label carries the verdict._' : '';
   const extra = opts['body-file'] ? `\n\n${readFileSync(opts['body-file'], 'utf8').trim()}` : '';
   const openText = open.length ? `\n\n**Open findings:**\n${open.map(t => `- [${t.id}] ${t.severity} — ${t.url}`).join('\n')}` : '';

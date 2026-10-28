@@ -58,16 +58,37 @@ says so ("local only", "don't post").
    defects; a fix can introduce one. Post new findings with `post`, continuing the numbering
    (`code-quality/H-2`, not a second `H-1`).
 4. Verdict as in the first review. `approve` is refused while an agent thread with CRITICAL, HIGH or
-   MEDIUM severity is open, or a CI check is failing or pending; it prints why. Do not pass `--force`
+   MEDIUM severity is open, or a CI check is failing; it prints why. Do not pass `--force`
    unless the user explicitly tells you to approve anyway. LOW findings do not block.
+
+## When CI is not green
+
+`verdict --decision approve` checks CI itself, so you never decide on CI by hand:
+
+- CI running: it waits (up to `--wait-minutes`, default 15), then decides on the result.
+- CI green: it approves, label `review: approved`.
+- A check failed: it requests changes, headed "❌ CI FAILED" with the failing checks, label
+  `review: ci-failed`. The return value has `status: posted` and `event: REQUEST_CHANGES`.
+
+The wait is longer than a foreground tool call may last. Claude Code: run it with
+`run_in_background: true` and wait for the notification. Codex: set the command timeout to at
+least 16 minutes (`timeout_ms: 960000`).
+
+- `refused` with `checks still running`: run the same `verdict` again once. If CI still runs,
+  report "not approved yet: CI still running".
+- `refused` with `new commits arrived`: re-review the new commits first.
+
+Never report a pull request as approved unless `verdict` returned `status: posted` and
+`event: APPROVE` (or `COMMENT` with label `review: approved`). A text "approved" without the
+review and the label is not a verdict.
 
 ## What the verdict looks like
 
 - Reviewer account ≠ PR author: a real GitHub **Approve** or **Request changes**.
 - Reviewer account = PR author: GitHub forbids both, so the verdict is a comment headed
-  "✅ APPROVED" or "❌ CHANGES REQUESTED".
-- Always: the label `review: approved` or `review: changes-requested`. The other review labels,
-  `review: requested` among them, are removed.
+  "✅ APPROVED", "❌ CHANGES REQUESTED" or "❌ CI FAILED".
+- Always: the label `review: approved`, `review: changes-requested` or `review: ci-failed`. The
+  other review labels, `review: requested` among them, are removed.
 
 ## Review labels
 
@@ -76,16 +97,17 @@ A pull request carries exactly one `review: …` label. It tells everyone who ac
 | Label | Set by | Means |
 |---|---|---|
 | `review: requested` | the author agent, with `request-review` | the code waits for a reviewer |
-| `review: changes-requested` | the reviewer, with `verdict` | the code waits for the author |
+| `review: changes-requested` | the reviewer, with `verdict` | findings wait for the author |
+| `review: ci-failed` | the reviewer, with `verdict` | the review passed; failing CI waits for the author |
 | `review: approved` | the reviewer, with `verdict` | a person may merge |
 
 The author agent runs `request-review` after each of these, even without this skill loaded:
 
 - it opens a pull request (a draft gets the label when it is marked ready);
-- it pushes fixes for review findings;
+- it pushes fixes for review findings or for failing CI;
 - it answers the reviewer's findings or questions in comments, with or without new code.
 
-`request-review` creates the label when the repository lacks it and removes the other two. The
+`request-review` creates the label when the repository lacks it and removes the others. The
 reviewer never runs it.
 
 ## Never

@@ -5,7 +5,8 @@ A pull request carries exactly one `review: …` label. It says who acts next:
 | Label | Set by | Means |
 |---|---|---|
 | `review: requested` | the author | the code waits for a reviewer |
-| `review: changes-requested` | the reviewer | the code waits for the author |
+| `review: changes-requested` | the reviewer | findings wait for the author |
+| `review: ci-failed` | the reviewer | the review passed; failing CI waits for the author |
 | `review: approved` | the reviewer | a person may merge |
 
 ## When you are the author
@@ -13,16 +14,18 @@ A pull request carries exactly one `review: …` label. It says who acts next:
 Set `review: requested` after each of these:
 
 - you open a pull request (a draft: when you mark it ready for review);
-- you push fixes for review findings;
+- you push fixes for review findings or for failing CI;
 - you answer the reviewer's findings or questions in comments, with or without new code.
 
 ```bash
-node ~/.claude/skills/pr-review/scripts/pr-review.mjs request-review --pr <n>
+node "$HOME/.claude/skills/pr-review/scripts/pr-review.mjs" request-review --pr <n>
 ```
 
-It creates the label when the repository lacks it, and removes `review: approved` and
-`review: changes-requested`. A push without review findings to address (more work on a pull
-request nobody reviewed yet) needs no new call: the label is already there.
+`$HOME` works in bash, zsh and PowerShell alike; `~` is not expanded for `node` everywhere.
+
+It creates the label when the repository lacks it, and removes the other review labels. A push
+without review findings or CI failures to address (more work on a pull request nobody reviewed
+yet) needs no new call: the label is already there.
 
 ## When you are the reviewer
 

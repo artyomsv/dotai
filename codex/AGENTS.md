@@ -12,18 +12,19 @@ For any code review or re-review in such a repository, use the `$review-all` ski
 ## Pull Request Review Labels
 
 A pull request carries exactly one label: `review: requested` (waits for a reviewer),
-`review: changes-requested` (waits for the author) or `review: approved` (a person may merge).
-The reviewer sets the verdict labels through the `$pr-review` skill.
+`review: changes-requested` (findings wait for the author), `review: ci-failed` (the review passed,
+failing CI waits for the author) or `review: approved` (a person may merge). The reviewer sets the
+verdict labels through the `$pr-review` skill.
 
 As the author, set `review: requested` after you open a pull request (a draft: when you mark it
-ready), after you push fixes for review findings, and after you answer the reviewer's findings or
-questions in comments:
+ready), after you push fixes for review findings or failing CI, and after you answer the
+reviewer's findings or questions in comments:
 
 ```bash
-node ~/.codex/skills/pr-review/scripts/pr-review.mjs request-review --pr <n>
+node "$HOME/.codex/skills/pr-review/scripts/pr-review.mjs" request-review --pr <n>
 ```
 
-It creates the label when missing and removes the other two. Never run it as the reviewer.
+It creates the label when missing and removes the other review labels. Never run it as the reviewer.
 Full rule: `~/.claude/rules/pr-review-labels.md`.
 
 ## No Local Builds
